@@ -1,4 +1,4 @@
-# Adira Auto-Reply Bot
+# Auto-Reply Bot
 
 Automatically detects password-reset-related emails in a Gmail inbox and sends a helpful reply — continuously, with duplicate-reply protection.
 
