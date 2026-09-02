@@ -3,6 +3,10 @@
 
 # Runtime state
 replied_ids.txt
+escalated_ids.txt
+unsolved_escalations.log
+closed_threads.txt
+closed_message_ids.txt
 
 # Python
 .venv/

@@ -5,8 +5,11 @@ Automatically detects password-reset-related emails in a Gmail inbox and sends a
 ## Features
 
 - Scans all emails (read and unread) every 30 seconds
+- **Classifies emails** into two categories: **Password Reset** and **Tech Issue** — sends different templates for each
 - Detects password-reset intent using normalized regex matching (handles typos, varied phrasing, Outlook-encoded headers)
-- Sends an HTML auto-reply with step-by-step reset instructions
+- Sends an HTML auto-reply with step-by-step reset instructions or troubleshooting steps
+- **Detects unresolved issues from ANY category** — automatically flags and escalates replies indicating problems persist
+- **Blocks automated senders** (Google, Outlook, no-reply, noreply, mailer-daemon, etc.) to avoid replying to system emails
 - Persists replied Message-IDs so the same email is never replied to twice, even across restarts
 - Graceful error recovery — a failed scan cycle is logged and retried
 
@@ -14,6 +17,7 @@ Automatically detects password-reset-related emails in a Gmail inbox and sends a
 
 - Python 3.9+
 - A Gmail account with **IMAP enabled** and a **Google App Password** (requires 2-Step Verification)
+- **Supports emails in English and Indonesian (Bahasa Indonesia)**
 
 ## Setup
 
@@ -54,6 +58,21 @@ python auto.py
 
 Press `Ctrl+C` to stop.
 
+## Generated Files
+
+The bot creates/maintains these files:
+
+| File | Purpose |
+|---|---|
+| `.env` | Your credentials (gitignored) |
+| `replied_ids.txt` | Track of all Message-IDs already replied to |
+| `escalated_ids.txt` | Track of all Message-IDs already escalated (prevents duplicate flagging) |
+| `closed_threads.txt` | Track of closed sender + subject conversation threads after escalation |
+| `closed_message_ids.txt` | Track of closed Message-IDs and reply-chain references after escalation |
+| `unsolved_escalations.log` | Log of unresolved issues from ANY category requiring human review (includes category: [PASSWORD_RESET] or [TECH_ISSUE]) |
+
+Check `unsolved_escalations.log` regularly to see escalated tickets.
+
 ## Configuration
 
 All options live in `.env`:
@@ -67,15 +86,99 @@ All options live in `.env`:
 
 ## How matching works
 
-The bot normalizes email text (strips accents, punctuation, extra whitespace) then checks it against patterns including:
+The bot normalizes email text (strips accents, punctuation, extra whitespace) then checks it against patterns for two categories. **Supports both English and Indonesian languages.**
 
-- `reset password` / `password reset`
-- `forgot password` / `forgot my pass`
+### Password Reset Patterns
+
+**English:**
+- `reset password`, `password reset`
+- `forgot password`, `forgot my pass`
 - `change password`
-- `can't log in` / `unable to login`
+- `can't log in`, `unable to login`
 - `lost password`
-- `recover account / password / access`
-- `account locked`
-- `password expired`
+- `recover account/password/access`
+- `account locked`, `password expired`
 
-Works with senders using any email client (Outlook, Yahoo, Apple Mail, etc.).
+**Indonesian (Bahasa Indonesia):**
+- `reset kata sandi`, `reset sandi`, `reset pw`
+- `lupa password`, `lupa kata sandi`, `lupa sandi`, `lupa pw`
+- `ubah password`, `ubah sandi`
+- `gak bisa login`, `nggak bisa login`, `tidak bisa masuk`
+- `akun terkunci`, `akun kunci`
+- `password kadaluarsa`, `sandi kedaluwarsa`
+- `recover akun`, `recover account`
+
+### Tech Issue Patterns
+
+**English:**
+- `error`, `bug`, `crash`
+- `not working`, `doesn't work`, `broken`
+- `failed`, `issue`, `problem`
+- `can't access`, `cannot access`
+- `connection`, `timeout`
+- HTTP error codes: `500`, `404`, `502`, `503`
+- `slow`, `lag`, `freeze`, `unresponsive`
+- `login failed`, `authentication failed`
+- `blank screen`, `white screen`, etc.
+
+**Indonesian (Bahasa Indonesia):**
+- `galat`, `kesalahan` (error)
+- `bug`, `kutu` (bug)
+- `tidak bisa bekerja`, `gak bisa jalan` (not working)
+- `tidak bisa buka`, `gak bisa akses` (can't access)
+- `rusak` (broken)
+- `gagal` (failed)
+- `masalah`, `problem`, `kendala`, `gangguan` (issue/problem)
+- `lambat`, `lelet` (slow)
+- `lag`, `putus`, `delay` (lag/lag)
+- `layar hitam`, `layar putih` (black/white screen)
+- `eror` (error - common typo)
+- `koneksi` (connection)
+
+### Unsolved/Unresolved Detection Patterns (for escalation)
+
+**English:**
+- `"still not working"`, `"still doesn't work"`
+- `"still have error"`, `"still getting error"`
+- `"not yet fixed"`, `"problem persists"`
+- `"hasn't fixed"`, `"still broken"`
+- `"same problem"`, `"same issue"`
+
+**Indonesian (Bahasa Indonesia):**
+- `"masih tidak bisa"`, `"tetap rusak"`
+- `"masih dapat error"`, `"masih dapat eror"`
+- `"belum selesai"`, `"belum diperbaiki"`
+- `"masalah masih ada"`, `"sama masalah"`
+- `"udah coba tapi masih gak bisa"` (tried but still doesn't work)
+
+### Automated Sender Blocking
+The bot **automatically skips** emails from automated systems to avoid spam loops:
+
+Blocked patterns include:
+- `no-reply@`, `noreply@` 
+- `@google.com`, `@microsoft.com`, `@amazon.com`, `@outlook.com`
+- `mailer-daemon@`, `postmaster@`, `admin@`
+- `security-alert@`, `verify@`
+- And more system sender patterns
+
+Works with user emails from any client (Outlook, Yahoo, Apple Mail, etc.) while stopping system notifications.
+
+## Escalation & Unsolved Issues
+
+If a customer replies to ANY category (Password Reset or Tech Issue) saying the issue is **still not fixed**, the bot automatically:
+1. ✓ Detects the "unsolved" reply using patterns like:
+   - English: `"still not working"`, `"problem persists"`, `"hasn't fixed"`, `"still broken"`
+   - Indonesian: `"masih tidak bisa"`, `"tetap rusak"`, `"belum selesai"`, `"sama masalah"`
+2. ✓ **Classifies** the original issue category (Password Reset or Tech Issue)
+3. ✓ **Flags** the email as starred in Gmail (visible as ⭐ in your inbox)
+4. ✓ **Logs** the escalation to `unsolved_escalations.log` with category, timestamp, sender, and subject
+
+This means support staff will know exactly which category of issue is unresolved and needs human intervention.
+
+**Example escalation log:**
+```
+2026-09-02T14:25:03.123456 | [PASSWORD_RESET] | user@example.com | Still can't reset my password | MsgID: <abc@gmail.com>
+2026-09-02T14:26:05.789012 | [TECH_ISSUE] | user2@example.com | App still crashing after restart | MsgID: <def@gmail.com>
+```
+
+This allows your support team to quickly understand the context and prioritize unresolved issues by type.
