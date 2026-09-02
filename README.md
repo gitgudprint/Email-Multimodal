@@ -19,17 +19,11 @@ Automatically detects password-reset and tech-issue emails in a Gmail inbox and 
 - A Gmail account with **IMAP enabled** and a **Google App Password** (requires 2-Step Verification)
 - Supports emails in English and Indonesian (Bahasa Indonesia)
 
-## Setup
+## Quick Start
 
-### 1. Enable Gmail IMAP
-
-Gmail Settings → **See all settings** → **Forwarding and POP/IMAP** → Enable IMAP → Save.
-
-### 2. Generate a Google App Password
-
-[myaccount.google.com](https://myaccount.google.com) → Security → 2-Step Verification → App passwords → create one for "Mail".
-
-### 3. Install dependencies
+1. Enable Gmail IMAP in Gmail settings.
+2. Create a Google App Password.
+3. Install dependencies:
 
 ```bash
 python -m venv .venv
@@ -37,7 +31,7 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 4. Configure credentials
+4. Configure credentials:
 
 ```bash
 cp .env.example .env
@@ -45,18 +39,63 @@ cp .env.example .env
 
 Edit `.env` and fill in your Gmail address and App Password:
 
-```
+```ini
 GMAIL_ADDRESS=you@gmail.com
 APP_PASSWORD=xxxx xxxx xxxx xxxx
 ```
 
-### 5. Run
+5. Run the bot:
 
 ```bash
 python auto.py
 ```
 
 Press `Ctrl+C` to stop.
+
+## Usage
+
+### Basic run
+
+After setup, start the bot with:
+
+```bash
+python auto.py
+```
+
+The bot will check the inbox on the interval set by `CHECK_INTERVAL` in `.env` and automatically reply to matching emails.
+
+### Example workflow
+
+- A new email arrives with: `I forgot my password and can't log in`
+- The bot matches it as **Password Reset**
+- It sends the password reset template reply
+- If the sender later replies with `It still doesn't work`, the bot escalates it as an unresolved issue
+
+### Example supported messages
+
+**Password Reset**
+- `I forgot my password`
+- `reset kata sandi akun saya`
+- `can't log in to my account`
+
+**Tech Issue**
+- `the app keeps crashing`
+- `aplikasinya error terus`
+- `I get a 500 error when I open the page`
+
+### Example output
+
+When the bot processes matching messages, you can expect behavior like:
+
+```text
+[INFO] Checking inbox...
+[INFO] Matched category: PASSWORD_RESET
+[INFO] Reply sent and Message-ID stored
+[INFO] Checking inbox...
+[INFO] Matched category: TECH_ISSUE
+[INFO] Reply sent and Message-ID stored
+[WARN] Unresolved reply detected — escalated for human review
+```
 
 ## Generated Files
 
